@@ -18,6 +18,7 @@ data Node = ArrayNode | ObjectNode T.Text deriving (Show, Eq, Ord)
 
 type Path = [Node]
 type PathValue = (Path, Value)
+type Mashup = M.Map Path (M.Map B.ByteString Int)
 
 loadJson :: FilePath -> IO Value
 loadJson f = B.readFile f >>= either error pure . eitherDecode
@@ -44,13 +45,13 @@ formatPath p = foldr f T.empty p
   where f ArrayNode a = a `T.append` "[]"
         f (ObjectNode t) a = a `T.append` "." `T.append` t
 
-mash :: [PathValue] -> M.Map Path (M.Map B.ByteString Int)
+mash :: [PathValue] -> Mashup
 mash xs = foldl buildOuter M.empty xs
   where buildOuter a (p,v) = M.insertWith sumKeys p (singletonValue v) a
         sumKeys = M.unionWith (+)
         singletonValue v = M.singleton (encode v) 1
 
-formatMash :: M.Map Path (M.Map B.ByteString Int) -> [T.Text]
+formatMash :: Mashup -> [T.Text]
 formatMash m = concatMap formatCounts $ M.toList m
   where formatCounts (p,m) = pathText : (clipList 15 cont $ map (TL.toStrict . fromCount) values)
           where pathText = T.concat [formatPath p, ": ", total, " total, ", distinctness]
