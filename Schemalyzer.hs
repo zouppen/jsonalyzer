@@ -18,7 +18,7 @@ data Node = ArrayNode | ObjectNode T.Text deriving (Show, Eq, Ord)
 
 type Path = [Node]
 type PathValue = (Path, Value)
-type Mashup = M.Map Path (M.Map B.ByteString Int)
+type Mashup = M.Map Path (HMS.HashMap Value Int)
 
 loadJson :: FilePath -> IO Value
 loadJson f = B.readFile f >>= either error pure . eitherDecode
@@ -48,8 +48,8 @@ formatPath p = foldr f T.empty p
 mash :: [PathValue] -> Mashup
 mash xs = foldl buildOuter M.empty xs
   where buildOuter a (p,v) = M.insertWith sumKeys p (singletonValue v) a
-        sumKeys = M.unionWith (+)
-        singletonValue v = M.singleton (encode v) 1
+        sumKeys = HMS.unionWith (+)
+        singletonValue v = HMS.singleton v 1
 
 formatMash :: Mashup -> [T.Text]
 formatMash m = concatMap formatCounts $ M.toList m
@@ -57,11 +57,11 @@ formatMash m = concatMap formatCounts $ M.toList m
           where pathText = T.concat [formatPath p, ": ", total, " total, ", distinctness]
                 spaces = "        "
                 cont   = "        ..."
-                fromCount (bs,n) = clipLine 80 $ TL.concat
-                                   [spaces, TL.pack $ show n, "x ", TL.decodeUtf8 bs]
-                values = sortWith (negate.snd) $ M.toList m
-                distinct = toText $ M.size m
-                total = toText $ sum $ M.elems m
+                fromCount (val,n) = clipLine 80 $ TL.concat
+                                   [spaces, TL.pack $ show n, "x ", TL.decodeUtf8 $ encode val]
+                values = sortWith (negate.snd) $ HMS.toList m
+                distinct = toText $ HMS.size m
+                total = toText $ sum $ HMS.elems m
                 distinctness = if total == distinct
                                then "all distinct"
                                else distinct `T.append` " distinct"
